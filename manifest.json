@@ -1,0 +1,14 @@
+{
+  "name": "出遊紀錄",
+  "short_name": "出遊紀錄",
+  "description": "記下每一次出門的日子",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FAFAF7",
+  "theme_color": "#FAFAF7",
+  "icons": [
+    { "src": "./icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>出遊紀錄</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="出遊紀錄">
+<meta name="theme-color" content="#FAFAF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+<style>
+:root {
+  --bg: #FAFAF7; --card: #FFFFFF; --ink: #1C1C1E; --ink-2: #6B6B6E; --ink-3: #A0A0A3;
+  --line: #E6E6E2; --day1: #3787DD; --day1-soft: #E6F1FB; --day1-text: #185FA5;
+  --multi: #1D9E75; --multi-soft: #E1F5EE; --multi-text: #0F6E56;
+  --danger: #D14343; --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141416; --card: #1F1F22; --ink: #ECECEA; --ink-2: #A8A8AB; --ink-3: #6E6E71;
+    --line: #2E2E32; --day1: #5EA3E8; --day1-soft: #17324D; --day1-text: #9CC6F0;
+    --multi: #35B98D; --multi-soft: #0E3A2D; --multi-text: #8FDFC4;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  font-size: 16px; line-height: 1.6;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  min-height: 100vh;
+}
+.wrap { max-width: 480px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+button {
+  font: inherit; border: none; cursor: pointer; border-radius: 10px;
+  background: var(--ink); color: var(--bg); padding: 12px 18px; font-weight: 500;
+}
+button.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line); }
+button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+button.icon { background: transparent; color: var(--ink-2); padding: 8px; font-size: 20px; line-height: 1; }
+button:disabled { opacity: 0.5; }
+input, textarea {
+  font: inherit; width: 100%; border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; background: var(--card); color: var(--ink);
+}
+input:focus, textarea:focus { outline: 2px solid var(--day1); border-color: transparent; }
+label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px; }
+.hidden { display: none !important; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.msg { font-size: 14px; margin-top: 12px; min-height: 1.4em; }
+.msg.err { color: var(--danger); }
+.msg.ok { color: var(--multi-text); }
+
+/* 月份導覽 */
+.month-nav { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 4px; }
+.month-nav .title { font-size: 17px; font-weight: 600; }
+
+/* 橫條圖 */
+.gantt { margin-top: 8px; }
+.gantt-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); padding: 0 2px 4px; }
+.gantt-rows { border-top: 1px solid var(--line); padding-top: 10px; position: relative; }
+.gantt-today { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--danger); opacity: 0.5; }
+.gantt-row { position: relative; height: 34px; }
+.gantt-bar {
+  position: absolute; top: 3px; height: 28px; border-radius: 7px;
+  background: var(--day1); min-width: 28px; cursor: pointer;
+  transition: transform 0.1s;
+}
+.gantt-bar.multi { background: var(--multi); }
+.gantt-bar.active { outline: 2px solid var(--ink); outline-offset: 1px; }
+.gantt-bar:active { transform: scale(0.96); }
+.gantt-label {
+  position: absolute; top: 3px; font-size: 12px; line-height: 28px;
+  color: var(--ink-2); white-space: nowrap; pointer-events: none;
+}
+.gantt-empty { color: var(--ink-3); font-size: 14px; text-align: center; padding: 24px 0; }
+
+/* 行程卡片 */
+.trip-card { margin-top: 12px; }
+.trip-badge {
+  display: inline-block; font-size: 13px; font-weight: 500;
+  background: var(--day1-soft); color: var(--day1-text);
+  border-radius: 8px; padding: 3px 10px; margin-bottom: 6px;
+}
+.trip-badge.multi { background: var(--multi-soft); color: var(--multi-text); }
+.trip-loc { font-size: 16px; font-weight: 600; margin: 0 0 2px; }
+.trip-note { font-size: 14px; color: var(--ink-2); margin: 0; white-space: pre-wrap; }
+.photo-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.photo-row img {
+  width: 76px; height: 76px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--line); cursor: pointer;
+}
+.trip-actions { display: flex; gap: 8px; margin-top: 12px; }
+.trip-actions button { padding: 8px 14px; font-size: 14px; }
+
+/* 新增按鈕(懸浮) */
+.fab {
+  position: fixed; right: 20px; bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 56px; height: 56px; border-radius: 50%; font-size: 28px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+
+/* 表單面板 */
+.sheet-mask {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 10;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet {
+  background: var(--bg); width: 100%; max-width: 480px;
+  border-radius: 16px 16px 0 0; padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
+  max-height: 88vh; overflow-y: auto;
+}
+.sheet h2 { font-size: 17px; margin: 0 0 4px; }
+.date-pair { display: flex; gap: 10px; }
+.date-pair > div { flex: 1; }
+.thumb-edit { position: relative; display: inline-block; }
+.thumb-edit .rm {
+  position: absolute; top: -6px; right: -6px; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--danger); color: #fff; font-size: 14px;
+  padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.legend .l1::before { background: var(--day1); }
+.legend .l2::before { background: var(--multi); }
+</style>
+</head>
+<body>
+
+<!-- ========== 登入畫面 ========== -->
+<div id="auth-view" class="wrap hidden">
+  <div style="padding: 48px 0 24px; text-align: center;">
+    <div style="font-size: 40px;">⛰️</div>
+    <h1 style="margin-top: 8px;">出遊紀錄</h1>
+    <p style="color: var(--ink-2); font-size: 14px; margin: 4px 0 0;">記下每一次出門的日子</p>
+  </div>
+  <div class="card">
+    <label for="login-email">Email</label>
+    <input id="login-email" type="email" autocomplete="username" placeholder="name@example.com">
+    <label for="login-pw">密碼</label>
+    <input id="login-pw" type="password" autocomplete="current-password" placeholder="輸入密碼">
+    <button id="btn-login" style="width: 100%; margin-top: 18px;">登入</button>
+    <button id="btn-forgot" class="ghost" style="width: 100%; margin-top: 10px;">忘記密碼</button>
+    <p id="auth-msg" class="msg"></p>
+  </div>
+</div>
+
+<!-- ========== 設定密碼畫面(接受邀請 / 重設密碼) ========== -->
+<div id="setpw-view" class="wrap hidden">
+  <div style="padding: 48px 0 24px; text-align: center;">
+    <h1>設定你的密碼</h1>
+    <p style="color: var(--ink-2); font-size: 14px; margin: 4px 0 0;">設定完成後即可開始使用</p>
+  </div>
+  <div class="card">
+    <label for="new-pw">新密碼(至少 6 個字元)</label>
+    <input id="new-pw" type="password" autocomplete="new-password">
+    <label for="new-pw2">再輸入一次</label>
+    <input id="new-pw2" type="password" autocomplete="new-password">
+    <button id="btn-setpw" style="width: 100%; margin-top: 18px;">完成設定</button>
+    <p id="setpw-msg" class="msg"></p>
+  </div>
+</div>
+
+<!-- ========== 主畫面 ========== -->
+<div id="app-view" class="wrap hidden">
+  <div class="header-bar">
+    <h1>出遊紀錄</h1>
+    <button id="btn-logout" class="ghost" style="padding: 6px 12px; font-size: 13px;">登出</button>
+  </div>
+
+  <div class="month-nav">
+    <button class="icon" id="btn-prev" aria-label="上個月">‹</button>
+    <span class="title" id="month-title"></span>
+    <button class="icon" id="btn-next" aria-label="下個月">›</button>
+  </div>
+
+  <div class="gantt">
+    <div class="gantt-axis" id="gantt-axis"></div>
+    <div class="gantt-rows" id="gantt-rows"></div>
+    <div class="legend"><span class="l1">當日來回</span><span class="l2">多日旅行</span></div>
+  </div>
+
+  <div id="trip-list"></div>
+
+  <button class="fab" id="btn-add" aria-label="新增出遊">+</button>
+</div>
+
+<!-- ========== 新增 / 編輯表單 ========== -->
+<div id="sheet" class="sheet-mask hidden">
+  <div class="sheet">
+    <h2 id="sheet-title">新增出遊</h2>
+    <div class="date-pair">
+      <div><label for="f-start">開始日期</label><input id="f-start" type="date"></div>
+      <div><label for="f-end">結束日期</label><input id="f-end" type="date"></div>
+    </div>
+    <label for="f-loc">地點</label>
+    <input id="f-loc" type="text" placeholder="例如:陽明山">
+    <label for="f-note">備註</label>
+    <textarea id="f-note" rows="3" placeholder="吃了什麼、去了哪些地方…"></textarea>
+    <label>照片</label>
+    <div class="photo-row" id="f-existing"></div>
+    <input id="f-photos" type="file" accept="image/*" multiple style="padding: 10px;">
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="ghost" id="btn-cancel" style="flex: 1;">取消</button>
+      <button id="btn-save" style="flex: 2;">儲存</button>
+    </div>
+    <p id="sheet-msg" class="msg"></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ============ 設定(已填入你的專案資訊) ============
+const SUPABASE_URL = "https://wuqsjeerglmqkzaagwvb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_9s_UQnHe8TgJL1Jbfi7kwg_idYZsfQH";
+// ====================================================
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = (id) => document.getElementById(id);
+const views = ["auth-view", "setpw-view", "app-view"];
+function show(view) { views.forEach(v => $(v).classList.toggle("hidden", v !== view)); }
+
+let current = new Date(); current.setDate(1);
+let trips = [];
+let editingId = null;
+let editingPhotos = [];
+let activeTripId = null;
+let signedUrlCache = {};
+
+// ---------- 啟動:判斷登入狀態 ----------
+const urlHasInvite = /type=(invite|recovery)/.test(window.location.hash);
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "PASSWORD_RECOVERY") { show("setpw-view"); return; }
+  if (session && urlHasInvite) { show("setpw-view"); return; }
+  if (session) { show("app-view"); loadMonth(); }
+  else { show("auth-view"); }
+});
+
+// ---------- 登入 / 登出 / 忘記密碼 ----------
+$("btn-login").onclick = async () => {
+  const email = $("login-email").value.trim();
+  const pw = $("login-pw").value;
+  setMsg("auth-msg", "登入中…");
+  const { error } = await db.auth.signInWithPassword({ email, password: pw });
+  if (error) setMsg("auth-msg", "登入失敗:帳號或密碼不正確", true);
+  else setMsg("auth-msg", "");
+};
+
+$("btn-forgot").onclick = async () => {
+  const email = $("login-email").value.trim();
+  if (!email) { setMsg("auth-msg", "請先在上方輸入 Email,再按忘記密碼", true); return; }
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  if (error) setMsg("auth-msg", "寄送失敗,請稍後再試", true);
+  else setMsg("auth-msg", "重設密碼的信已寄出,請到信箱點連結");
+};
+
+$("btn-logout").onclick = async () => { await db.auth.signOut(); };
+
+// ---------- 設定密碼(邀請 / 重設共用) ----------
+$("btn-setpw").onclick = async () => {
+  const p1 = $("new-pw").value, p2 = $("new-pw2").value;
+  if (p1.length < 6) { setMsg("setpw-msg", "密碼至少要 6 個字元", true); return; }
+  if (p1 !== p2) { setMsg("setpw-msg", "兩次輸入的密碼不一樣", true); return; }
+  const { error } = await db.auth.updateUser({ password: p1 });
+  if (error) { setMsg("setpw-msg", "設定失敗:" + error.message, true); return; }
+  history.replaceState(null, "", window.location.pathname);
+  show("app-view"); loadMonth();
+};
+
+function setMsg(id, text, isErr) {
+  const el = $(id); el.textContent = text;
+  el.className = "msg " + (isErr ? "err" : "ok");
+}
+
+// ---------- 月份切換 ----------
+$("btn-prev").onclick = () => { current.setMonth(current.getMonth() - 1); loadMonth(); };
+$("btn-next").onclick = () => { current.setMonth(current.getMonth() + 1); loadMonth(); };
+
+function fmt(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function localFmt(dateStr) {
+  const [y, m, d] = dateStr.split("-");
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
+const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+function weekday(dateStr) { return WEEK[new Date(dateStr + "T00:00:00").getDay()]; }
+
+// ---------- 讀取當月行程 ----------
+async function loadMonth() {
+  const y = current.getFullYear(), m = current.getMonth();
+  const monthStart = new Date(y, m, 1), monthEnd = new Date(y, m + 1, 0);
+  $("month-title").textContent = `${y} 年 ${m + 1} 月`;
+
+  const { data, error } = await db.from("trips")
+    .select("*")
+    .lte("start_date", fmt(monthEnd))
+    .gte("end_date", fmt(monthStart))
+    .order("start_date", { ascending: true });
+
+  if (error) { $("trip-list").innerHTML = `<p class="msg err">讀取失敗:${error.message}</p>`; return; }
+  trips = data;
+  activeTripId = null;
+  renderGantt(monthStart, monthEnd);
+  renderList();
+}
+
+// ---------- 橫條圖 ----------
+function renderGantt(monthStart, monthEnd) {
+  const days = monthEnd.getDate();
+  const axis = $("gantt-axis");
+  axis.innerHTML = "";
+  [1, 5, 10, 15, 20, 25, days].forEach(d => {
+    const s = document.createElement("span"); s.textContent = d; axis.appendChild(s);
+  });
+
+  const rows = $("gantt-rows");
+  rows.innerHTML = "";
+
+  const today = new Date();
+  if (today.getFullYear() === monthStart.getFullYear() && today.getMonth() === monthStart.getMonth()) {
+    const line = document.createElement("div");
+    line.className = "gantt-today";
+    line.style.left = ((today.getDate() - 0.5) / days * 100) + "%";
+    rows.appendChild(line);
+  }
+
+  if (!trips.length) {
+    rows.innerHTML += `<div class="gantt-empty">這個月還沒有出遊紀錄</div>`;
+    return;
+  }
+
+  trips.forEach(t => {
+    const s = new Date(Math.max(new Date(t.start_date + "T00:00:00"), monthStart));
+    const e = new Date(Math.min(new Date(t.end_date + "T00:00:00"), monthEnd));
+    const startDay = s.getDate(), endDay = e.getDate();
+    const leftPct = (startDay - 1) / days * 100;
+    const widthPct = (endDay - startDay + 1) / days * 100;
+    const isMulti = t.start_date !== t.end_date;
+
+    const row = document.createElement("div");
+    row.className = "gantt-row";
+
+    const bar = document.createElement("div");
+    bar.className = "gantt-bar" + (isMulti ? " multi" : "") + (t.id === activeTripId ? " active" : "");
+    bar.style.left = leftPct + "%";
+    bar.style.width = widthPct + "%";
+    bar.onclick = () => {
+      activeTripId = (activeTripId === t.id) ? null : t.id;
+      renderGantt(monthStart, monthEnd);
+      const cardEl = document.getElementById("trip-" + t.id);
+      if (cardEl && activeTripId) cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    row.appendChild(bar);
+
+    const label = document.createElement("span");
+    label.className = "gantt-label";
+    label.textContent = t.location;
+    if (leftPct + widthPct > 62) {
+      label.style.right = (100 - leftPct) + "%";
+      label.style.paddingRight = "8px";
+    } else {
+      label.style.left = `calc(${leftPct + widthPct}% + 8px)`;
+      label.style.minWidth = "36px";
+    }
+    row.appendChild(label);
+    rows.appendChild(row);
+  });
+}
+
+// ---------- 行程卡片列表 ----------
+async function renderList() {
+  const list = $("trip-list");
+  list.innerHTML = "";
+  for (const t of trips) {
+    const isMulti = t.start_date !== t.end_date;
+    const dayCount = Math.round((new Date(t.end_date) - new Date(t.start_date)) / 86400000) + 1;
+    const badge = isMulti
+      ? `${localFmt(t.start_date)} ${weekday(t.start_date)} → ${localFmt(t.end_date)} ${weekday(t.end_date)} · ${dayCount} 天`
+      : `${localFmt(t.start_date)} 週${weekday(t.start_date)}`;
+
+    const card = document.createElement("div");
+    card.className = "card trip-card";
+    card.id = "trip-" + t.id;
+    card.innerHTML = `
+      <span class="trip-badge${isMulti ? " multi" : ""}">${badge}</span>
+      <p class="trip-loc">${esc(t.location)}</p>
+      ${t.note ? `<p class="trip-note">${esc(t.note)}</p>` : ""}
+      <div class="photo-row" id="photos-${t.id}"></div>
+      <div class="trip-actions">
+        <button class="ghost" data-edit="${t.id}">編輯</button>
+        <button class="danger" data-del="${t.id}">刪除</button>
+      </div>`;
+    list.appendChild(card);
+    loadPhotos(t);
+  }
+  list.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => openSheet(b.dataset.edit));
+  list.querySelectorAll("[data-del]").forEach(b => b.onclick = () => delTrip(b.dataset.del));
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function loadPhotos(t) {
+  const paths = t.photos || [];
+  if (!paths.length) return;
+  const el = $("photos-" + t.id);
+  const urls = await signedUrls(paths);
+  el.innerHTML = "";
+  urls.forEach(u => {
+    if (!u) return;
+    const img = document.createElement("img");
+    img.src = u; img.loading = "lazy"; img.alt = "出遊照片";
+    img.onclick = () => window.open(u, "_blank");
+    el.appendChild(img);
+  });
+}
+
+async function signedUrls(paths) {
+  const need = paths.filter(p => !signedUrlCache[p]);
+  if (need.length) {
+    const { data } = await db.storage.from("trip-photos").createSignedUrls(need, 3600);
+    (data || []).forEach((d, i) => { if (d.signedUrl) signedUrlCache[need[i]] = d.signedUrl; });
+  }
+  return paths.map(p => signedUrlCache[p]);
+}
+
+// ---------- 新增 / 編輯 ----------
+$("btn-add").onclick = () => openSheet(null);
+$("btn-cancel").onclick = closeSheet;
+$("sheet").onclick = (e) => { if (e.target === $("sheet")) closeSheet(); };
+
+$("f-start").onchange = () => {
+  if (!$("f-end").value || $("f-end").value < $("f-start").value) $("f-end").value = $("f-start").value;
+};
+
+function openSheet(id) {
+  editingId = id;
+  const t = trips.find(x => x.id === id);
+  $("sheet-title").textContent = t ? "編輯出遊" : "新增出遊";
+  $("f-start").value = t ? t.start_date : fmt(new Date());
+  $("f-end").value = t ? t.end_date : fmt(new Date());
+  $("f-loc").value = t ? t.location : "";
+  $("f-note").value = t ? (t.note || "") : "";
+  $("f-photos").value = "";
+  editingPhotos = t ? [...(t.photos || [])] : [];
+  renderExisting();
+  setMsg("sheet-msg", "");
+  $("sheet").classList.remove("hidden");
+}
+
+function closeSheet() { $("sheet").classList.add("hidden"); }
+
+async function renderExisting() {
+  const el = $("f-existing");
+  el.innerHTML = "";
+  if (!editingPhotos.length) return;
+  const urls = await signedUrls(editingPhotos);
+  editingPhotos.forEach((p, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "thumb-edit";
+    wrap.innerHTML = `<img src="${urls[i] || ""}" alt="已上傳照片"><button class="rm" aria-label="移除照片">×</button>`;
+    wrap.querySelector(".rm").onclick = () => { editingPhotos.splice(i, 1); renderExisting(); };
+    el.appendChild(wrap);
+  });
+}
+
+$("btn-save").onclick = async () => {
+  const start = $("f-start").value, end = $("f-end").value;
+  const loc = $("f-loc").value.trim(), note = $("f-note").value.trim();
+  if (!start || !end) { setMsg("sheet-msg", "請選擇日期", true); return; }
+  if (end < start) { setMsg("sheet-msg", "結束日期不能早於開始日期", true); return; }
+  if (!loc) { setMsg("sheet-msg", "請填寫地點", true); return; }
+
+  $("btn-save").disabled = true;
+  try {
+    const files = $("f-photos").files;
+    const newPaths = [];
+    for (let i = 0; i < files.length; i++) {
+      setMsg("sheet-msg", `照片上傳中 ${i + 1}/${files.length}…`);
+      const blob = await compress(files[i]);
+      const path = `${Date.now()}-${i}.jpg`;
+      const { error } = await db.storage.from("trip-photos").upload(path, blob, { contentType: "image/jpeg" });
+      if (error) throw new Error("照片上傳失敗:" + error.message);
+      newPaths.push(path);
+    }
+    const record = { start_date: start, end_date: end, location: loc, note, photos: [...editingPhotos, ...newPaths] };
+    setMsg("sheet-msg", "儲存中…");
+    const q = editingId
+      ? db.from("trips").update(record).eq("id", editingId)
+      : db.from("trips").insert(record);
+    const { error } = await q;
+    if (error) throw new Error("儲存失敗:" + error.message);
+    closeSheet();
+    loadMonth();
+  } catch (e) {
+    setMsg("sheet-msg", e.message, true);
+  } finally {
+    $("btn-save").disabled = false;
+  }
+};
+
+async function delTrip(id) {
+  if (!confirm("確定要刪除這筆出遊紀錄嗎?照片也會一起刪除。")) return;
+  const t = trips.find(x => x.id === id);
+  if (t && t.photos && t.photos.length) {
+    await db.storage.from("trip-photos").remove(t.photos);
+  }
+  const { error } = await db.from("trips").delete().eq("id", id);
+  if (error) alert("刪除失敗:" + error.message);
+  loadMonth();
+}
+
+// ---------- 照片壓縮(省流量與空間) ----------
+function compress(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        const ratio = Math.min(MAX / width, MAX / height);
+        width = Math.round(width * ratio); height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error("圖片處理失敗")), "image/jpeg", 0.82);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => reject(new Error("無法讀取圖片"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+</script>
+</body>
+</html>
