@@ -173,7 +173,10 @@ label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px
 <div id="app-view" class="wrap hidden">
   <div class="header-bar">
     <h1>出遊紀錄</h1>
-    <button id="btn-logout" class="ghost" style="padding: 6px 12px; font-size: 13px;">登出</button>
+    <div style="display: flex; gap: 8px;">
+      <button id="btn-changepw" class="ghost" style="padding: 6px 12px; font-size: 13px;">變更密碼</button>
+      <button id="btn-logout" class="ghost" style="padding: 6px 12px; font-size: 13px;">登出</button>
+    </div>
   </div>
 
   <div class="month-nav">
@@ -191,6 +194,25 @@ label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px
   <div id="trip-list"></div>
 
   <button class="fab" id="btn-add" aria-label="新增出遊">+</button>
+</div>
+
+<!-- ========== 變更密碼 ========== -->
+<div id="pw-sheet" class="sheet-mask hidden">
+  <div class="sheet">
+    <h2>變更密碼</h2>
+    <label for="cp-old">原密碼</label>
+    <input id="cp-old" type="password" autocomplete="current-password">
+    <label for="cp-new">新密碼(至少 6 個字元)</label>
+    <input id="cp-new" type="password" autocomplete="new-password">
+    <label for="cp-new2">再輸入一次新密碼</label>
+    <input id="cp-new2" type="password" autocomplete="new-password">
+    <p style="font-size: 12px; color: var(--ink-3); margin: 10px 0 0;">忘記原密碼?請先登出,在登入畫面使用「忘記密碼」。</p>
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="ghost" id="cp-cancel" style="flex: 1;">取消</button>
+      <button id="cp-save" style="flex: 2;">確認變更</button>
+    </div>
+    <p id="cp-msg" class="msg"></p>
+  </div>
 </div>
 
 <!-- ========== 新增 / 編輯表單 ========== -->
@@ -264,6 +286,41 @@ $("btn-forgot").onclick = async () => {
 };
 
 $("btn-logout").onclick = async () => { await db.auth.signOut(); };
+
+// ---------- 變更密碼 ----------
+$("btn-changepw").onclick = () => {
+  ["cp-old", "cp-new", "cp-new2"].forEach(id => $(id).value = "");
+  setMsg("cp-msg", "");
+  $("pw-sheet").classList.remove("hidden");
+};
+$("cp-cancel").onclick = () => $("pw-sheet").classList.add("hidden");
+$("pw-sheet").onclick = (e) => { if (e.target === $("pw-sheet")) $("pw-sheet").classList.add("hidden"); };
+
+$("cp-save").onclick = async () => {
+  const oldPw = $("cp-old").value, p1 = $("cp-new").value, p2 = $("cp-new2").value;
+  if (!oldPw) { setMsg("cp-msg", "請輸入原密碼", true); return; }
+  if (p1.length < 6) { setMsg("cp-msg", "新密碼至少要 6 個字元", true); return; }
+  if (p1 !== p2) { setMsg("cp-msg", "兩次輸入的新密碼不一樣", true); return; }
+  if (p1 === oldPw) { setMsg("cp-msg", "新密碼不能和原密碼相同", true); return; }
+
+  $("cp-save").disabled = true;
+  try {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) throw new Error("登入狀態異常,請重新登入");
+    setMsg("cp-msg", "驗證原密碼中…");
+    const { error: verifyErr } = await db.auth.signInWithPassword({ email: user.email, password: oldPw });
+    if (verifyErr) throw new Error("原密碼不正確");
+    setMsg("cp-msg", "更新中…");
+    const { error } = await db.auth.updateUser({ password: p1 });
+    if (error) throw new Error("變更失敗:" + error.message);
+    setMsg("cp-msg", "密碼已變更 ✓");
+    setTimeout(() => $("pw-sheet").classList.add("hidden"), 900);
+  } catch (e) {
+    setMsg("cp-msg", e.message, true);
+  } finally {
+    $("cp-save").disabled = false;
+  }
+};
 
 // ---------- 設定密碼(邀請 / 重設共用) ----------
 $("btn-setpw").onclick = async () => {
