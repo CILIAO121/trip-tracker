@@ -10,8 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="出遊紀錄">
-<meta name="theme-color" content="#FFF6F1" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#221A20" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FFF6F1">
 <style>
 :root {
   --bg: #FFF6F1; --card: #FFFFFF; --ink: #4A3540; --ink-2: #967C88; --ink-3: #C2ACB6;
@@ -19,16 +18,10 @@
   --multi: #7DCFB6; --multi-soft: #E3F7EF; --multi-text: #2E8A6E;
   --danger: #E5646E; --radius: 16px;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #221A20; --card: #2E242B; --ink: #F5E9EE; --ink-2: #C2A9B5; --ink-3: #8A7280;
-    --line: #46363F; --day1: #F48FA8; --day1-soft: #4A2733; --day1-text: #FFC2D1;
-    --multi: #6FC7AD; --multi-soft: #1E3B32; --multi-text: #A8E8D3;
-    --danger: #F08590;
-  }
-}
+/* 固定使用淺色主題,不跟隨系統深色模式 */
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; color-scheme: light; }
 body {
   background: var(--bg); color: var(--ink);
   font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
