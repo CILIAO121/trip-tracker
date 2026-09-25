@@ -10,20 +10,21 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="出遊紀錄">
-<meta name="theme-color" content="#FAFAF7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FFF6F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#221A20" media="(prefers-color-scheme: dark)">
 <style>
 :root {
-  --bg: #FAFAF7; --card: #FFFFFF; --ink: #1C1C1E; --ink-2: #6B6B6E; --ink-3: #A0A0A3;
-  --line: #E6E6E2; --day1: #3787DD; --day1-soft: #E6F1FB; --day1-text: #185FA5;
-  --multi: #1D9E75; --multi-soft: #E1F5EE; --multi-text: #0F6E56;
-  --danger: #D14343; --radius: 12px;
+  --bg: #FFF6F1; --card: #FFFFFF; --ink: #4A3540; --ink-2: #967C88; --ink-3: #C2ACB6;
+  --line: #F5E3E7; --day1: #FF9FB2; --day1-soft: #FFE9EE; --day1-text: #C4536F;
+  --multi: #7DCFB6; --multi-soft: #E3F7EF; --multi-text: #2E8A6E;
+  --danger: #E5646E; --radius: 16px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #141416; --card: #1F1F22; --ink: #ECECEA; --ink-2: #A8A8AB; --ink-3: #6E6E71;
-    --line: #2E2E32; --day1: #5EA3E8; --day1-soft: #17324D; --day1-text: #9CC6F0;
-    --multi: #35B98D; --multi-soft: #0E3A2D; --multi-text: #8FDFC4;
+    --bg: #221A20; --card: #2E242B; --ink: #F5E9EE; --ink-2: #C2A9B5; --ink-3: #8A7280;
+    --line: #46363F; --day1: #F48FA8; --day1-soft: #4A2733; --day1-text: #FFC2D1;
+    --multi: #6FC7AD; --multi-soft: #1E3B32; --multi-text: #A8E8D3;
+    --danger: #F08590;
   }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -39,7 +40,7 @@ body {
 h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
 button {
   font: inherit; border: none; cursor: pointer; border-radius: 10px;
-  background: var(--ink); color: var(--bg); padding: 12px 18px; font-weight: 500;
+  background: var(--day1); color: #FFFFFF; padding: 12px 18px; font-weight: 500;
 }
 button.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line); }
 button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
@@ -68,12 +69,12 @@ label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px
 .gantt-today { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--danger); opacity: 0.5; }
 .gantt-row { position: relative; height: 34px; }
 .gantt-bar {
-  position: absolute; top: 3px; height: 28px; border-radius: 7px;
+  position: absolute; top: 3px; height: 28px; border-radius: 14px;
   background: var(--day1); min-width: 28px; cursor: pointer;
   transition: transform 0.1s;
 }
 .gantt-bar.multi { background: var(--multi); }
-.gantt-bar.active { outline: 2px solid var(--ink); outline-offset: 1px; }
+.gantt-bar.active { outline: 2px solid var(--day1-text); outline-offset: 1px; }
 .gantt-bar:active { transform: scale(0.96); }
 .gantt-label {
   position: absolute; top: 3px; font-size: 12px; line-height: 28px;
@@ -506,8 +507,11 @@ function openSheet(id) {
   editingId = id;
   const t = trips.find(x => x.id === id);
   $("sheet-title").textContent = t ? "編輯出遊" : "新增出遊";
-  $("f-start").value = t ? t.start_date : fmt(new Date());
-  $("f-end").value = t ? t.end_date : fmt(new Date());
+  const today = new Date();
+  const sameMonth = today.getFullYear() === current.getFullYear() && today.getMonth() === current.getMonth();
+  const defaultDate = sameMonth ? fmt(today) : fmt(current);
+  $("f-start").value = t ? t.start_date : defaultDate;
+  $("f-end").value = t ? t.end_date : defaultDate;
   $("f-loc").value = t ? t.location : "";
   $("f-note").value = t ? (t.note || "") : "";
   $("f-photos").value = "";
