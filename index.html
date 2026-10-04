@@ -86,6 +86,29 @@ label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px
 .trip-loc { font-size: 16px; font-weight: 600; margin: 0 0 2px; }
 .trip-note { font-size: 14px; color: var(--ink-2); margin: 0; white-space: pre-wrap; }
 .photo-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.tl { margin: 8px 0 0; }
+.tl-row { display: flex; gap: 10px; font-size: 13px; line-height: 1.9; }
+.tl-time { color: var(--day1-text); font-weight: 600; min-width: 44px; }
+.tl-row::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--day1); margin-top: 9px; flex-shrink: 0; }
+.more-btn { margin-top: 8px; padding: 6px 12px; font-size: 13px; }
+.search-row { display: flex; gap: 8px; margin: 10px 0 2px; }
+.search-row input { flex: 1; padding: 9px 14px; border-radius: 12px; font-size: 14px; }
+.search-results { margin-top: 6px; }
+.search-item {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 6px; font-size: 14px; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.search-item .d { color: var(--ink-2); font-size: 13px; }
+.tl-edit-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.tl-edit-row input[type="time"] { width: 110px; flex-shrink: 0; }
+.tl-edit-row .rm-tl { background: transparent; color: var(--danger); padding: 4px 8px; font-size: 18px; }
+.thumb-edit .star {
+  position: absolute; bottom: -6px; left: -6px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--card); border: 1px solid var(--line);
+  font-size: 13px; padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.thumb-edit .star.on { background: #FFD97D; border-color: #E8B94A; }
 .photo-row img {
   width: 76px; height: 76px; object-fit: cover; border-radius: 8px;
   border: 1px solid var(--line); cursor: pointer;
@@ -173,6 +196,11 @@ label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px
     </div>
   </div>
 
+  <div class="search-row">
+    <input id="search-q" type="search" placeholder="搜尋地點或備註…">
+  </div>
+  <div class="search-results" id="search-results"></div>
+
   <div class="month-nav">
     <button class="icon" id="btn-prev" aria-label="上個月">‹</button>
     <span class="title" id="month-title"></span>
@@ -221,7 +249,10 @@ label { display: block; font-size: 13px; color: var(--ink-2); margin: 14px 0 6px
     <input id="f-loc" type="text" placeholder="例如:陽明山">
     <label for="f-note">備註</label>
     <textarea id="f-note" rows="3" placeholder="吃了什麼、去了哪些地方…"></textarea>
-    <label>照片</label>
+    <label>時間軸(當天的行程,選填)</label>
+    <div id="f-timeline"></div>
+    <button class="ghost" id="btn-add-tl" style="padding: 7px 14px; font-size: 13px;">+ 加一行</button>
+    <label>照片(點 ⭐ 設為精選,卡片上只先顯示精選)</label>
     <div class="photo-row" id="f-existing"></div>
     <input id="f-photos" type="file" accept="image/*" multiple style="padding: 10px;">
     <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -248,6 +279,9 @@ let current = new Date(); current.setDate(1);
 let trips = [];
 let editingId = null;
 let editingPhotos = [];
+let editingFeatured = [];
+let editingTimeline = [];
+let expandedPhotos = {};
 let activeTripId = null;
 let signedUrlCache = {};
 
@@ -348,7 +382,41 @@ const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 function weekday(dateStr) { return WEEK[new Date(dateStr + "T00:00:00").getDay()]; }
 
 // ---------- 讀取當月行程 ----------
-async function loadMonth() {
+// ---------- 搜尋 ----------
+let searchTimer = null;
+$("search-q").oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(doSearch, 350);
+};
+
+async function doSearch() {
+  const q = $("search-q").value.trim();
+  const box = $("search-results");
+  if (!q) { box.innerHTML = ""; return; }
+  const { data, error } = await db.from("trips")
+    .select("id, start_date, end_date, location, note")
+    .or(`location.ilike.%${q}%,note.ilike.%${q}%`)
+    .order("start_date", { ascending: false })
+    .limit(20);
+  if (error) { box.innerHTML = `<p class="msg err">搜尋失敗</p>`; return; }
+  if (!data.length) { box.innerHTML = `<p style="font-size:13px;color:var(--ink-3);margin:4px 2px;">找不到「${esc(q)}」</p>`; return; }
+  box.innerHTML = "";
+  data.forEach(t => {
+    const item = document.createElement("div");
+    item.className = "search-item";
+    item.innerHTML = `<span>${esc(t.location)}</span><span class="d">${t.start_date.replace(/-/g, "/")}</span>`;
+    item.onclick = () => {
+      $("search-q").value = "";
+      box.innerHTML = "";
+      const [y, m] = t.start_date.split("-").map(Number);
+      current = new Date(y, m - 1, 1);
+      loadMonth(t.id);
+    };
+    box.appendChild(item);
+  });
+}
+
+async function loadMonth(focusId) {
   const y = current.getFullYear(), m = current.getMonth();
   const monthStart = new Date(y, m, 1), monthEnd = new Date(y, m + 1, 0);
   $("month-title").textContent = `${y} 年 ${m + 1} 月`;
@@ -361,9 +429,15 @@ async function loadMonth() {
 
   if (error) { $("trip-list").innerHTML = `<p class="msg err">讀取失敗:${error.message}</p>`; return; }
   trips = data;
-  activeTripId = null;
+  activeTripId = focusId || null;
   renderGantt(monthStart, monthEnd);
   renderList();
+  if (focusId) {
+    setTimeout(() => {
+      const el = document.getElementById("trip-" + focusId);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 250);
+  }
 }
 
 // ---------- 橫條圖 ----------
@@ -447,6 +521,7 @@ async function renderList() {
       <span class="trip-badge${isMulti ? " multi" : ""}">${badge}</span>
       <p class="trip-loc">${esc(t.location)}</p>
       ${t.note ? `<p class="trip-note">${esc(t.note)}</p>` : ""}
+      ${renderTimelineHtml(t.timeline)}
       <div class="photo-row" id="photos-${t.id}"></div>
       <div class="trip-actions">
         <button class="ghost" data-edit="${t.id}">編輯</button>
@@ -463,11 +538,26 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function renderTimelineHtml(timeline) {
+  const rows = timeline || [];
+  if (!rows.length) return "";
+  return `<div class="tl">` + rows.map(r =>
+    `<div class="tl-row"><span class="tl-time">${esc(r.t || "")}</span><span>${esc(r.x || "")}</span></div>`
+  ).join("") + `</div>`;
+}
+
 async function loadPhotos(t) {
   const paths = t.photos || [];
   if (!paths.length) return;
   const el = $("photos-" + t.id);
-  const urls = await signedUrls(paths);
+  const featured = (t.featured || []).filter(p => paths.includes(p));
+  const showAll = !!expandedPhotos[t.id];
+  let display, hiddenCount;
+  if (showAll) { display = paths; hiddenCount = 0; }
+  else if (featured.length) { display = featured; hiddenCount = paths.length - featured.length; }
+  else { display = paths.slice(0, 3); hiddenCount = paths.length - display.length; }
+
+  const urls = await signedUrls(display);
   el.innerHTML = "";
   urls.forEach(u => {
     if (!u) return;
@@ -476,6 +566,21 @@ async function loadPhotos(t) {
     img.onclick = () => window.open(u, "_blank");
     el.appendChild(img);
   });
+  if (hiddenCount > 0) {
+    const btn = document.createElement("button");
+    btn.className = "ghost more-btn";
+    btn.textContent = `還有 ${hiddenCount} 張 ▾`;
+    btn.onclick = () => { expandedPhotos[t.id] = true; loadPhotos(t); };
+    el.parentElement.insertBefore(btn, el.nextSibling);
+  } else if (showAll && paths.length > 3) {
+    const btn = document.createElement("button");
+    btn.className = "ghost more-btn";
+    btn.textContent = "收合 ▴";
+    btn.onclick = () => { expandedPhotos[t.id] = false; loadPhotos(t); };
+    el.parentElement.insertBefore(btn, el.nextSibling);
+  }
+  const oldBtn = el.parentElement.querySelectorAll(".more-btn");
+  if (oldBtn.length > 1) oldBtn.forEach((b, i) => { if (i < oldBtn.length - 1) b.remove(); });
 }
 
 async function signedUrls(paths) {
@@ -509,6 +614,9 @@ function openSheet(id) {
   $("f-note").value = t ? (t.note || "") : "";
   $("f-photos").value = "";
   editingPhotos = t ? [...(t.photos || [])] : [];
+  editingFeatured = t ? [...(t.featured || [])] : [];
+  editingTimeline = t ? (t.timeline || []).map(r => ({ ...r })) : [];
+  renderTimelineEditor();
   renderExisting();
   setMsg("sheet-msg", "");
   $("sheet").classList.remove("hidden");
@@ -522,11 +630,43 @@ async function renderExisting() {
   if (!editingPhotos.length) return;
   const urls = await signedUrls(editingPhotos);
   editingPhotos.forEach((p, i) => {
+    const isFeat = editingFeatured.includes(p);
     const wrap = document.createElement("div");
     wrap.className = "thumb-edit";
-    wrap.innerHTML = `<img src="${urls[i] || ""}" alt="已上傳照片"><button class="rm" aria-label="移除照片">×</button>`;
-    wrap.querySelector(".rm").onclick = () => { editingPhotos.splice(i, 1); renderExisting(); };
+    wrap.innerHTML = `<img src="${urls[i] || ""}" alt="已上傳照片">
+      <button class="rm" aria-label="移除照片">×</button>
+      <button class="star${isFeat ? " on" : ""}" aria-label="設為精選">⭐</button>`;
+    wrap.querySelector(".rm").onclick = () => {
+      editingPhotos.splice(i, 1);
+      editingFeatured = editingFeatured.filter(f => f !== p);
+      renderExisting();
+    };
+    wrap.querySelector(".star").onclick = () => {
+      if (editingFeatured.includes(p)) editingFeatured = editingFeatured.filter(f => f !== p);
+      else editingFeatured.push(p);
+      renderExisting();
+    };
     el.appendChild(wrap);
+  });
+}
+
+// ---------- 時間軸編輯 ----------
+$("btn-add-tl").onclick = () => { editingTimeline.push({ t: "", x: "" }); renderTimelineEditor(); };
+
+function renderTimelineEditor() {
+  const el = $("f-timeline");
+  el.innerHTML = "";
+  editingTimeline.forEach((row, i) => {
+    const div = document.createElement("div");
+    div.className = "tl-edit-row";
+    div.innerHTML = `<input type="time" value="${row.t || ""}">
+      <input type="text" placeholder="做了什麼" value="${esc(row.x || "")}">
+      <button class="rm-tl" aria-label="刪除此行">×</button>`;
+    const [timeIn, textIn] = div.querySelectorAll("input");
+    timeIn.onchange = () => editingTimeline[i].t = timeIn.value;
+    textIn.oninput = () => editingTimeline[i].x = textIn.value;
+    div.querySelector(".rm-tl").onclick = () => { editingTimeline.splice(i, 1); renderTimelineEditor(); };
+    el.appendChild(div);
   });
 }
 
@@ -549,7 +689,16 @@ $("btn-save").onclick = async () => {
       if (error) throw new Error("照片上傳失敗:" + error.message);
       newPaths.push(path);
     }
-    const record = { start_date: start, end_date: end, location: loc, note, photos: [...editingPhotos, ...newPaths] };
+    const allPhotos = [...editingPhotos, ...newPaths];
+    const timeline = editingTimeline
+      .filter(r => (r.x || "").trim())
+      .sort((a, b) => (a.t || "99:99").localeCompare(b.t || "99:99"));
+    const record = {
+      start_date: start, end_date: end, location: loc, note,
+      photos: allPhotos,
+      featured: editingFeatured.filter(p => allPhotos.includes(p)),
+      timeline
+    };
     setMsg("sheet-msg", "儲存中…");
     const q = editingId
       ? db.from("trips").update(record).eq("id", editingId)
